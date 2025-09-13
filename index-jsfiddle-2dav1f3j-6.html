@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html>
+
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ターン制バトルゲーム</title>
+
+  <style>
+    * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .battlefield {
+            background: linear-gradient(45deg, #0f3460, #16537e);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .teams-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+        }
+
+        .team {
+            flex: 1;
+        }
+
+        .team h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            color: #4ecdc4;
+        }
+
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .character {
+            background: linear-gradient(145deg, #2d3748, #1a202c);
+            border-radius: 12px;
+            padding: 15px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .character:hover {
+            border-color: #4ecdc4;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3);
+        }
+
+        .character.selected {
+            border-color: #ffd700;
+            background: linear-gradient(145deg, #4a5568, #2d3748);
+        }
+
+        .character.dead {
+            opacity: 0.5;
+            filter: grayscale(100%);
+        }
+
+        .character-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #e2e8f0;
+        }
+
+        .character-level {
+            font-size: 0.8em;
+            color: #a0aec0;
+            margin-bottom: 10px;
+        }
+
+        .health-bar, .energy-bar {
+            background: #2d3748;
+            border-radius: 10px;
+            height: 8px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+
+        .health-fill {
+            background: linear-gradient(90deg, #e53e3e, #38a169);
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+
+        .energy-fill {
+            background: linear-gradient(90deg, #3182ce, #805ad5);
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+
+        .stats {
+            font-size: 0.7em;
+            color: #cbd5e0;
+            margin-top: 5px;
+        }
+
+        .turn-order {
+            background: linear-gradient(135deg, #2d3748, #1a202c);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .turn-order h3 {
+            color: #4ecdc4;
+            margin-bottom: 15px;
+        }
+
+        .turn-queue {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .turn-indicator {
+            background: linear-gradient(145deg, #4a5568, #2d3748);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            border: 2px solid transparent;
+        }
+
+        .turn-indicator.active {
+            border-color: #ffd700;
+            background: linear-gradient(145deg, #d69e2e, #b7791f);
+        }
+
+        .action-panel {
+            background: linear-gradient(135deg, #2d3748, #1a202c);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .action-btn {
+            background: linear-gradient(145deg, #4299e1, #3182ce);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 20px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            min-width: 100px;
+        }
+
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 153, 225, 0.4);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-btn.attack { background: linear-gradient(145deg, #e53e3e, #c53030); }
+        .action-btn.skill { background: linear-gradient(145deg, #805ad5, #6b46c1); }
+        .action-btn.ultimate { background: linear-gradient(145deg, #d69e2e, #b7791f); }
+        .action-btn.defend { background: linear-gradient(145deg, #38a169, #2f855a); }
+
+        .battle-log {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border: 1px solid #4a5568;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .damage { color: #ff6b6b; }
+        .healing { color: #51cf66; }
+        .info { color: #74c0fc; }
+
+        @keyframes damage-flash {
+            0% { background-color: rgba(255, 0, 0, 0.3); }
+            50% { background-color: rgba(255, 0, 0, 0.7); }
+            100% { background-color: transparent; }
+        }
+
+        @keyframes heal-flash {
+            0% { background-color: rgba(0, 255, 0, 0.3); }
+            50% { background-color: rgba(0, 255, 0, 0.7); }
+            100% { background-color: transparent; }
+        }
+
+        .flash-damage {
+            animation: damage-flash 0.5s ease;
+        }
+
+        .flash-heal {
+            animation: heal-flash 0.5s ease;
+        }
+  </style>
+
+  
+</head>
+<body>
+  <div class="game-container">
+        <h1 style="text-align: center; margin-bottom: 30px; color: #4ecdc4;">ターン制バトルゲーム</h1>
+        
+        <div class="turn-order">
+            <h3>ターン順序</h3>
+            <div class="turn-queue" id="turnQueue"></div>
+        </div>
+
+        <div class="battlefield">
+            <div class="teams-container">
+                <div class="team">
+                    <h3>プレイヤー</h3>
+                    <div class="character-grid" id="playerTeam"></div>
+                </div>
+                <div class="team">
+                    <h3>エネミー</h3>
+                    <div class="character-grid" id="enemyTeam"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-panel">
+            <h3 style="text-align: center; margin-bottom: 20px; color: #4ecdc4;">アクション</h3>
+            <div class="actions">
+                <button class="action-btn attack" onclick="selectAction('attack')">攻撃</button>
+                <button class="action-btn skill" onclick="selectAction('skill')">スキル</button>
+                <button class="action-btn ultimate" onclick="selectAction('ultimate')">必殺技</button>
+                <button class="action-btn defend" onclick="selectAction('defend')">防御</button>
+            </div>
+            <div id="targetSelection" style="margin-top: 20px; text-align: center; display: none;">
+                <h4 style="color: #4ecdc4;">ターゲットを選択してください</h4>
+            </div>
+        </div>
+
+        <div class="battle-log">
+            <div id="battleLog"></div>
+        </div>
+    </div>
+
+  <script>
+    class Character {
+            constructor(name, level, maxHp, attack, defense, speed, isPlayer = true) {
+                this.name = name;
+                this.level = level;
+                this.maxHp = maxHp;
+                this.hp = maxHp;
+                this.attack = attack;
+                this.defense = defense;
+                this.speed = speed;
+                this.isPlayer = isPlayer;
+                this.maxEnergy = 100;
+                this.energy = 0;
+                this.isDefending = false;
+                this.buffs = [];
+                this.debuffs = [];
+            }
+
+            takeDamage(damage) {
+                const actualDamage = Math.max(1, damage - (this.isDefending ? this.defense * 0.5 : 0));
+                this.hp = Math.max(0, this.hp - actualDamage);
+                this.energy = Math.min(this.maxEnergy, this.energy + 20);
+                return actualDamage;
+            }
+
+            heal(amount) {
+                const actualHeal = Math.min(amount, this.maxHp - this.hp);
+                this.hp += actualHeal;
+                return actualHeal;
+            }
+
+            isAlive() {
+                return this.hp > 0;
+            }
+
+            canUseSkill() {
+                return this.energy >= 50;
+            }
+
+            canUseUltimate() {
+                return this.energy >= 100;
+            }
+        }
+
+        const gameState = {
+            playerTeam: [
+                new Character("星", 50, 300, 80, 40, 95, true),
+                new Character("丹恒", 48, 280, 75, 35, 100, true),
+                new Character("三月七", 45, 250, 65, 50, 85, true),
+                new Character("姫子", 52, 320, 90, 45, 80, true)
+            ],
+            enemyTeam: [
+                new Character("虚無の影", 50, 400, 70, 30, 70, false),
+                new Character("星核の守護者", 55, 500, 85, 55, 60, false)
+            ],
+            currentTurn: 0,
+            turnOrder: [],
+            selectedCharacter: null,
+            selectedAction: null,
+            targetingMode: false
+        };
+
+        function initializeBattle() {
+            calculateTurnOrder();
+            renderBattlefield();
+            renderTurnOrder();
+            logMessage("バトル開始！", "info");
+            nextTurn();
+        }
+
+        function calculateTurnOrder() {
+            const allCharacters = [...gameState.playerTeam, ...gameState.enemyTeam]
+                .filter(char => char.isAlive())
+                .sort((a, b) => b.speed - a.speed);
+            
+            gameState.turnOrder = [];
+            for (let i = 0; i < 20; i++) {
+                gameState.turnOrder.push(...allCharacters);
+            }
+        }
+
+        function renderBattlefield() {
+            renderTeam(gameState.playerTeam, 'playerTeam');
+            renderTeam(gameState.enemyTeam, 'enemyTeam');
+        }
+
+        function renderTeam(team, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            team.forEach((character, index) => {
+                const charDiv = document.createElement('div');
+                charDiv.className = `character ${character.isAlive() ? '' : 'dead'}`;
+                charDiv.onclick = () => selectTarget(character);
+                
+                const hpPercentage = (character.hp / character.maxHp) * 100;
+                const energyPercentage = (character.energy / character.maxEnergy) * 100;
+
+                charDiv.innerHTML = `
+                    <div class="character-name">${character.name}</div>
+                    <div class="character-level">Lv.${character.level}</div>
+                    <div class="health-bar">
+                        <div class="health-fill" style="width: ${hpPercentage}%"></div>
+                    </div>
+                    <div style="font-size: 0.7em; color: #cbd5e0;">HP: ${character.hp}/${character.maxHp}</div>
+                    <div class="energy-bar">
+                        <div class="energy-fill" style="width: ${energyPercentage}%"></div>
+                    </div>
+                    <div style="font-size: 0.7em; color: #cbd5e0;">EP: ${character.energy}/${character.maxEnergy}</div>
+                    <div class="stats">
+                        ATK: ${character.attack} | DEF: ${character.defense} | SPD: ${character.speed}
+                    </div>
+                `;
+                
+                container.appendChild(charDiv);
+            });
+        }
+
+        function renderTurnOrder() {
+            const container = document.getElementById('turnQueue');
+            container.innerHTML = '';
+
+            const next10Turns = gameState.turnOrder.slice(gameState.currentTurn, gameState.currentTurn + 10);
+            
+            next10Turns.forEach((character, index) => {
+                const turnDiv = document.createElement('div');
+                turnDiv.className = `turn-indicator ${index === 0 ? 'active' : ''}`;
+                turnDiv.textContent = character.name;
+                container.appendChild(turnDiv);
+            });
+        }
+
+        function nextTurn() {
+            if (checkBattleEnd()) return;
+
+            const currentCharacter = gameState.turnOrder[gameState.currentTurn];
+            gameState.selectedCharacter = currentCharacter;
+            
+            updateActionButtons(currentCharacter);
+            renderTurnOrder();
+
+            if (!currentCharacter.isPlayer) {
+                setTimeout(() => enemyAI(currentCharacter), 1000);
+            } else {
+                logMessage(`${currentCharacter.name}のターン`, "info");
+            }
+        }
+
+        function updateActionButtons(character) {
+            const buttons = document.querySelectorAll('.action-btn');
+            const isPlayerTurn = character.isPlayer;
+
+            buttons.forEach(btn => {
+                btn.disabled = !isPlayerTurn;
+            });
+
+            if (isPlayerTurn) {
+                document.querySelector('.action-btn.skill').disabled = !character.canUseSkill();
+                document.querySelector('.action-btn.ultimate').disabled = !character.canUseUltimate();
+            }
+        }
+
+        function selectAction(action) {
+            if (!gameState.selectedCharacter || !gameState.selectedCharacter.isPlayer) return;
+
+            gameState.selectedAction = action;
+            gameState.targetingMode = true;
+            
+            const targetSelection = document.getElementById('targetSelection');
+            targetSelection.style.display = 'block';
+            
+            logMessage(`${action}を選択しました。ターゲットを選んでください。`, "info");
+        }
+
+        function selectTarget(target) {
+            if (!gameState.targetingMode) return;
+            if (!target.isAlive()) return;
+
+            const action = gameState.selectedAction;
+            const attacker = gameState.selectedCharacter;
+
+            executeAction(attacker, target, action);
+            endTurn();
+        }
+
+        function executeAction(attacker, target, action) {
+            let damage, heal, energyCost = 0;
+
+            switch (action) {
+                case 'attack':
+                    damage = Math.floor(attacker.attack * (0.8 + Math.random() * 0.4));
+                    const actualDamage = target.takeDamage(damage);
+                    flashEffect(target, 'damage');
+                    logMessage(`${attacker.name}が${target.name}に${actualDamage}ダメージを与えた！`, "damage");
+                    attacker.energy = Math.min(attacker.maxEnergy, attacker.energy + 10);
+                    break;
+
+                case 'skill':
+                    if (!attacker.canUseSkill()) return;
+                    energyCost = 50;
+                    damage = Math.floor(attacker.attack * 1.5);
+                    const skillDamage = target.takeDamage(damage);
+                    flashEffect(target, 'damage');
+                    logMessage(`${attacker.name}がスキルで${target.name}に${skillDamage}ダメージ！`, "damage");
+                    break;
+
+                case 'ultimate':
+                    if (!attacker.canUseUltimate()) return;
+                    energyCost = 100;
+                    if (attacker.isPlayer) {
+                        // プレイヤーの必殺技：全体攻撃
+                        const enemies = gameState.enemyTeam.filter(char => char.isAlive());
+                        enemies.forEach(enemy => {
+                            damage = Math.floor(attacker.attack * 1.2);
+                            const ultDamage = enemy.takeDamage(damage);
+                            flashEffect(enemy, 'damage');
+                            logMessage(`${attacker.name}の必殺技が${enemy.name}に${ultDamage}ダメージ！`, "damage");
+                        });
+                    } else {
+                        damage = Math.floor(attacker.attack * 2.0);
+                        const ultDamage = target.takeDamage(damage);
+                        flashEffect(target, 'damage');
+                        logMessage(`${attacker.name}の必殺技が${target.name}に${ultDamage}ダメージ！`, "damage");
+                    }
+                    break;
+
+                case 'defend':
+                    attacker.isDefending = true;
+                    heal = Math.floor(attacker.maxHp * 0.1);
+                    const actualHeal = attacker.heal(heal);
+                    flashEffect(attacker, 'heal');
+                    logMessage(`${attacker.name}は防御態勢をとり、${actualHeal}回復した！`, "healing");
+                    attacker.energy = Math.min(attacker.maxEnergy, attacker.energy + 15);
+                    break;
+            }
+
+            attacker.energy = Math.max(0, attacker.energy - energyCost);
+        }
+
+        function enemyAI(character) {
+            const alivePlayers = gameState.playerTeam.filter(char => char.isAlive());
+            if (alivePlayers.length === 0) return;
+
+            let action, target;
+            
+            if (character.canUseUltimate() && Math.random() < 0.3) {
+                action = 'ultimate';
+                target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+            } else if (character.canUseSkill() && Math.random() < 0.5) {
+                action = 'skill';
+                target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+            } else if (character.hp < character.maxHp * 0.3 && Math.random() < 0.4) {
+                action = 'defend';
+                target = character;
+            } else {
+                action = 'attack';
+                target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+            }
+
+            executeAction(character, target, action);
+            setTimeout(endTurn, 1500);
+        }
+
+        function endTurn() {
+            gameState.selectedCharacter.isDefending = false;
+            gameState.selectedCharacter = null;
+            gameState.selectedAction = null;
+            gameState.targetingMode = false;
+            gameState.currentTurn++;
+
+            document.getElementById('targetSelection').style.display = 'none';
+
+            renderBattlefield();
+            
+            if (gameState.currentTurn >= gameState.turnOrder.length - 10) {
+                calculateTurnOrder();
+                gameState.currentTurn = 0;
+            }
+
+            setTimeout(nextTurn, 500);
+        }
+
+        function flashEffect(character, type) {
+            const characterElements = document.querySelectorAll('.character');
+            const characterIndex = [...gameState.playerTeam, ...gameState.enemyTeam].indexOf(character);
+            
+            if (characterIndex !== -1 && characterElements[characterIndex]) {
+                characterElements[characterIndex].classList.add(`flash-${type}`);
+                setTimeout(() => {
+                    characterElements[characterIndex].classList.remove(`flash-${type}`);
+                }, 500);
+            }
+        }
+
+        function checkBattleEnd() {
+            const alivePlayers = gameState.playerTeam.filter(char => char.isAlive());
+            const aliveEnemies = gameState.enemyTeam.filter(char => char.isAlive());
+
+            if (alivePlayers.length === 0) {
+                logMessage("敗北... 全てのキャラクターが倒れました。", "damage");
+                setTimeout(() => location.reload(), 3000);
+                return true;
+            }
+
+            if (aliveEnemies.length === 0) {
+                logMessage("勝利！ 全ての敵を倒しました！", "healing");
+                setTimeout(() => location.reload(), 3000);
+                return true;
+            }
+
+            return false;
+        }
+
+        function logMessage(message, type) {
+            const log = document.getElementById('battleLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // ゲーム開始
+        initializeBattle();
+  </script>
+</body>
+</html>
